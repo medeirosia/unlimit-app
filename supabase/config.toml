@@ -1,0 +1,10 @@
+project_id = "uyzibbtejyqdfqlktlwd"
+
+[functions.fix-pending-withdrawal]
+verify_jwt = false
+
+[functions.cashflow-analysis]
+verify_jwt = false
+
+[functions.import-returns]
+verify_jwt = false

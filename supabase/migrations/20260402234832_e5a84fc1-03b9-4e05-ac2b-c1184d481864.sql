@@ -1,0 +1,1 @@
+ALTER TABLE public.pj_cashflow_reports ADD COLUMN profit_distribution numeric NOT NULL DEFAULT 0;

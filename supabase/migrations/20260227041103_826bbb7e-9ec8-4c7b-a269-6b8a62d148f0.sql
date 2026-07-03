@@ -1,0 +1,1 @@
+DELETE FROM pj_resends WHERE resend_date <= '2025-01-07';
