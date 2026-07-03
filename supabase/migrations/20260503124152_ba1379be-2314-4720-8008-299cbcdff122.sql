@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS public.idx_shipping_reports_carrier_due_date;

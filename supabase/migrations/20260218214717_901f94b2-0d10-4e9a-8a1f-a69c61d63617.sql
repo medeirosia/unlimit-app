@@ -1,0 +1,1 @@
+INSERT INTO pj_pricing_config (key, label, value) VALUES ('drop_fixed_cost_per_sale', 'Custo Fixo por Venda Drop (R$)', 2.90);

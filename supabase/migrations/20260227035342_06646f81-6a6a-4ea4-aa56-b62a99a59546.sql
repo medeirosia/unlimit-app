@@ -1,0 +1,1 @@
+UPDATE pj_aftersales_agents SET is_active = false WHERE name IN ('Ikaro', 'Cinthia');

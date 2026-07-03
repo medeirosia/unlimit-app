@@ -1,0 +1,1 @@
+ALTER TABLE public.pj_replenishment_items ADD COLUMN IF NOT EXISTS confirmed boolean NOT NULL DEFAULT false;

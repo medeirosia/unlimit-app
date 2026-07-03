@@ -1,0 +1,1 @@
+INSERT INTO public.pj_aftersales_agents (name, is_active) VALUES ('Allyson', true);
