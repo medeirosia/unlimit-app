@@ -8,6 +8,7 @@ interface BankAccount {
   id: string;
   name: string;
   balance: number;
+  real_balance?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,10 @@ export const FinancialSummaryCards = ({
   const canSeeTotal = can('financeiro.contas.saldo_total');
   const visibleAccounts = bankAccounts.filter(a => can('financeiro.contas.ver_conta', a.id));
   const totalBalance = visibleAccounts.reduce((sum, account) => sum + account.balance, 0);
+  const totalRealBalance = visibleAccounts
+    .filter((account) => account.real_balance !== null && account.real_balance !== undefined)
+    .reduce((sum, account) => sum + Number(account.real_balance || 0), 0);
+  const hasRealBalance = visibleAccounts.some((account) => account.real_balance !== null && account.real_balance !== undefined);
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -82,6 +87,7 @@ export const FinancialSummaryCards = ({
     {
       title: 'Saldo Total',
       value: canSeeTotal ? fmt(totalBalance) : '— oculto —',
+      subtitle: canSeeTotal && hasRealBalance ? `Saldo Real: ${fmt(totalRealBalance)}` : undefined,
       icon: canSeeTotal ? DollarSign : EyeOff,
       gradient: 'bg-gradient-to-r from-green-500 to-emerald-600',
     },
@@ -120,6 +126,11 @@ export const FinancialSummaryCards = ({
                   <Icon className="h-3 w-3 opacity-80" />
                 </div>
                 <div className="text-base font-bold truncate">{card.value}</div>
+                {card.subtitle && (
+                  <div className="mt-0.5 text-[10px] font-medium opacity-75 truncate">
+                    {card.subtitle}
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -141,6 +152,11 @@ export const FinancialSummaryCards = ({
                 <Icon className="h-4 w-4 opacity-70" />
               </div>
               <div className="text-lg font-semibold">{card.value}</div>
+              {card.subtitle && (
+                <div className="mt-0.5 text-[11px] font-medium opacity-75">
+                  {card.subtitle}
+                </div>
+              )}
             </CardContent>
           </Card>
         );
