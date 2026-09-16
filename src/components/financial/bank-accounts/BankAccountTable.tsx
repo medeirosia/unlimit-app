@@ -20,15 +20,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreVertical, Edit, Trash2, Archive, Wallet, CreditCard, Building2, Smartphone } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, Archive, Wallet, CreditCard, Building2, Smartphone, ClipboardCheck } from 'lucide-react';
 import { BankAccountTableRow } from './BankAccountTableRow';
 import { EditAccountDialog } from '../EditAccountDialog';
+import { UpdateRealBalanceDialog } from '../UpdateRealBalanceDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { BankAccount } from '@/types/financial';
 
 interface BankAccountTableProps {
   accounts: BankAccount[];
-  onUpdate: (id: string, updates: { name?: string; initial_balance?: number; category?: string }) => Promise<boolean>;
+  onUpdate: (id: string, updates: {
+    name?: string;
+    initial_balance?: number;
+    category?: string;
+    real_balance?: number | null;
+    real_balance_updated_at?: string | null;
+  }) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
   onArchive: (id: string) => Promise<boolean>;
 }
@@ -37,6 +44,7 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'created'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [realBalanceDialogOpen, setRealBalanceDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null);
@@ -101,6 +109,19 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
     return success;
   };
 
+  const handleUpdateRealBalance = async (realBalance: number | null) => {
+    if (!selectedAccount) return false;
+    const success = await onUpdate(selectedAccount.id, {
+      real_balance: realBalance,
+      real_balance_updated_at: realBalance === null ? null : new Date().toISOString(),
+    });
+    if (success) {
+      setRealBalanceDialogOpen(false);
+      setSelectedAccount(null);
+    }
+    return success;
+  };
+
   const handleDelete = async () => {
     if (!selectedAccount) return;
     const success = await onDelete(selectedAccount.id);
@@ -154,6 +175,13 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
                               <Edit className="h-4 w-4 mr-2" />
                               Editar Conta
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedAccount(account);
+                              setRealBalanceDialogOpen(true);
+                            }}>
+                              <ClipboardCheck className="h-4 w-4 mr-2" />
+                              Atualizar Saldo Real
+                            </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => {
                                 setSelectedAccount(account);
@@ -185,6 +213,14 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
                           R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
+                      <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs">
+                        <span className="text-slate-500">Saldo Real: </span>
+                        <span className="font-semibold text-slate-800">
+                          {account.real_balance === null || account.real_balance === undefined
+                            ? 'Não informado'
+                            : `R$ ${account.real_balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -203,6 +239,16 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
               }}
               account={selectedAccount}
               onSave={handleEdit}
+            />
+
+            <UpdateRealBalanceDialog
+              open={realBalanceDialogOpen}
+              onOpenChange={(open) => {
+                setRealBalanceDialogOpen(open);
+                if (!open) setSelectedAccount(null);
+              }}
+              account={selectedAccount}
+              onSave={handleUpdateRealBalance}
             />
 
             <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
@@ -288,6 +334,9 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
                     </span>
                   )}
                 </div>
+              </TableHead>
+              <TableHead className="py-3 px-6 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Saldo Real
               </TableHead>
               <TableHead className="py-3 px-6 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 Ações

@@ -77,6 +77,8 @@ export const useBankAccounts = () => {
     name?: string;
     initial_balance?: number;
     category?: string;
+    real_balance?: number | null;
+    real_balance_updated_at?: string | null;
   }) => {
     try {
       console.log('Updating bank account with:', { id, updates });
@@ -92,10 +94,13 @@ export const useBankAccounts = () => {
         return false;
       }
 
-      // Sempre recalcular saldo após atualização
-      await supabase.rpc('recalculate_bank_account_balance', {
-        account_id: id
-      });
+      // Recalcular apenas quando um campo que compõe o saldo contábil muda.
+      // O Saldo Real é uma conferência manual e não deve interferir nos lançamentos.
+      if (Object.prototype.hasOwnProperty.call(updates, 'initial_balance')) {
+        await supabase.rpc('recalculate_bank_account_balance', {
+          account_id: id
+        });
+      }
 
       toast.success('Conta bancária atualizada com sucesso!');
       await fetchBankAccounts();

@@ -2,6 +2,8 @@ export interface BankAccount {
   id: string;
   name: string;
   balance: number;
+  real_balance: number | null;
+  real_balance_updated_at: string | null;
   initial_balance: number;
   category?: string;
   created_at: string;

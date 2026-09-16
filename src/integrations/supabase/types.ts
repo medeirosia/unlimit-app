@@ -137,6 +137,8 @@ export type Database = {
           id: string
           initial_balance: number | null
           name: string
+          real_balance: number | null
+          real_balance_updated_at: string | null
           updated_at: string
           user_id: string
         }
@@ -148,6 +150,8 @@ export type Database = {
           id?: string
           initial_balance?: number | null
           name: string
+          real_balance?: number | null
+          real_balance_updated_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -159,6 +163,8 @@ export type Database = {
           id?: string
           initial_balance?: number | null
           name?: string
+          real_balance?: number | null
+          real_balance_updated_at?: string | null
           updated_at?: string
           user_id?: string
         }
