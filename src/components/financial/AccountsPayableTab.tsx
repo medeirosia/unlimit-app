@@ -58,7 +58,7 @@ export const AccountsPayableTab = ({
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('asc');
   const [selectedBankAccount, setSelectedBankAccount] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
-  const { payAccount, deletePayable } = usePayableActions(accountsPayable, bankAccounts, onDataChange);
+  const { payAccount, deletePayable, processingIds } = usePayableActions(accountsPayable, bankAccounts, onDataChange);
   const isMobile = useIsMobile();
   const [payableDialogOpen, setPayableDialogOpen] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
@@ -188,6 +188,7 @@ export const AccountsPayableTab = ({
         onPay={payAccount}
         onDelete={deletePayable}
         onDataChange={onDataChange}
+        processingIds={processingIds}
       />
       {/* Floating Action Button - Novo Pagamento */}
       <div className="fixed bottom-6 right-6 z-50">

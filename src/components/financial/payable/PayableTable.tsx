@@ -45,6 +45,7 @@ interface PayableTableProps {
   onPay: (payableId: string, bankAccountId: string) => void;
   onDelete: (payableId: string) => void;
   onDataChange: () => void;
+  processingIds: ReadonlySet<string>;
 }
 
 export const PayableTable = ({ 
@@ -53,7 +54,8 @@ export const PayableTable = ({
   expenseCategories, 
   onPay, 
   onDelete, 
-  onDataChange 
+  onDataChange,
+  processingIds
 }: PayableTableProps) => {
   const isMobile = useIsMobile();
 
@@ -107,8 +109,9 @@ export const PayableTable = ({
                       size="sm"
                       className="flex-1"
                       onClick={() => onPay(payable.id, payable.bank_account_id)}
+                      disabled={processingIds.has(payable.id)}
                     >
-                      Pagar
+                      {processingIds.has(payable.id) ? 'Pagando...' : 'Pagar'}
                     </Button>
                   )}
                   <PayableEditDialog
@@ -121,6 +124,7 @@ export const PayableTable = ({
                     size="sm"
                     variant="destructive"
                     onClick={() => onDelete(payable.id)}
+                    disabled={processingIds.has(payable.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -158,6 +162,7 @@ export const PayableTable = ({
                 onPay={onPay}
                 onDelete={onDelete}
                 onDataChange={onDataChange}
+                isProcessing={processingIds.has(payable.id)}
               />
             ))}
           </TableBody>

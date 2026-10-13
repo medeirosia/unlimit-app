@@ -758,6 +758,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_account_payable: {
+        Args: {
+          p_request_id: string
+          p_description: string
+          p_amount: number
+          p_category_id: string
+          p_bank_account_id: string
+          p_due_date: string
+          p_pay_immediately: boolean
+        }
+        Returns: string
+      }
+      pay_account_payable: { Args: { p_payable_id: string }; Returns: string }
+      undo_account_payable_payment: { Args: { p_transaction_id: string }; Returns: boolean }
       can_manage_permissions: { Args: never; Returns: boolean }
       delete_user_completo: { Args: { uid: string }; Returns: undefined }
       get_user_permissions: {

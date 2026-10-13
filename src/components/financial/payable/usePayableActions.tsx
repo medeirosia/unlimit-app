@@ -1,4 +1,5 @@
 
+import { useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -30,7 +31,11 @@ export const usePayableActions = (
   bankAccounts: BankAccount[],
   onDataChange: () => void
 ) => {
+  const processingRef = useRef(new Set<string>());
+  const [processingIds, setProcessingIds] = useState<Set<string>>(() => new Set());
+
   const payAccount = async (payableId: string, bankAccountId: string) => {
+    if (processingRef.current.has(payableId)) return;
     const payable = accountsPayable.find(p => p.id === payableId);
     if (!payable) {
       console.error('❌ Conta a pagar não encontrada');
@@ -44,61 +49,16 @@ export const usePayableActions = (
       return;
     }
 
-    console.log('💳 Processando pagamento:', {
-      payable_id: payableId,
-      description: payable.description,
-      amount: payable.amount,
-      bank_account: bankAccount.name,
-      current_balance: bankAccount.balance,
-      new_balance: bankAccount.balance - payable.amount
-    });
+    processingRef.current.add(payableId);
+    setProcessingIds(new Set(processingRef.current));
 
     try {
-      // Marcar conta como paga
-      const { error: payableError } = await supabase
-        .from('accounts_payable')
-        .update({
-          is_paid: true,
-          paid_date: payable.due_date // Usar a data de vencimento como data de pagamento
-        })
-        .eq('id', payableId);
-
-      if (payableError) {
-        console.error('❌ Erro ao atualizar conta a pagar:', payableError);
-        toast.error('Erro ao atualizar conta a pagar');
-        return;
-      }
-
-      // Recalcular saldo da conta bancária de forma atômica
-      const { error: balanceError } = await supabase.rpc('recalculate_bank_account_balance', {
-        account_id: bankAccountId
+      // O banco registra pagamento e extrato na mesma transação.
+      // Repetir a chamada retorna o pagamento já existente.
+      const { error } = await supabase.rpc('pay_account_payable', {
+        p_payable_id: payableId
       });
-
-      if (balanceError) {
-        console.error('❌ Erro ao recalcular saldo:', balanceError);
-        toast.error('Erro ao recalcular saldo');
-        return;
-      }
-
-      // Criar transação financeira
-      const { error: transactionError } = await supabase
-        .from('financial_transactions')
-        .insert([{
-          user_id: 'b5007d28-0311-4cc6-ae08-4a5b7c8cba34',
-          description: `Pagamento: ${payable.description}`,
-          amount: payable.amount,
-          type: 'payment',
-          from_account_id: bankAccountId,
-          reference_id: payableId,
-          reference_type: 'payable',
-          transaction_date: payable.due_date // Usar a data de vencimento como data da transação
-        }]);
-
-      if (transactionError) {
-        console.error('❌ Erro ao registrar transação:', transactionError);
-        toast.error('Erro ao registrar transação');
-        return;
-      }
+      if (error) throw error;
 
       console.log('✅ Pagamento processado com sucesso');
       toast.success('Pagamento realizado com sucesso');
@@ -107,6 +67,9 @@ export const usePayableActions = (
     } catch (error) {
       console.error('❌ Erro no processo de pagamento:', error);
       toast.error('Erro ao processar pagamento');
+    } finally {
+      processingRef.current.delete(payableId);
+      setProcessingIds(new Set(processingRef.current));
     }
   };
 
@@ -129,5 +92,5 @@ export const usePayableActions = (
     onDataChange();
   };
 
-  return { payAccount, deletePayable };
+  return { payAccount, deletePayable, processingIds };
 };

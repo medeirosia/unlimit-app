@@ -41,6 +41,7 @@ interface PayableTableRowProps {
   onPay: (payableId: string, bankAccountId: string) => void;
   onDelete: (payableId: string) => void;
   onDataChange: () => void;
+  isProcessing: boolean;
 }
 
 export const PayableTableRow = ({ 
@@ -49,7 +50,8 @@ export const PayableTableRow = ({
   expenseCategories, 
   onPay, 
   onDelete, 
-  onDataChange 
+  onDataChange,
+  isProcessing
 }: PayableTableRowProps) => {
   return (
     <TableRow>
@@ -73,8 +75,9 @@ export const PayableTableRow = ({
             <Button
               size="sm"
               onClick={() => onPay(payable.id, payable.bank_account_id)}
+              disabled={isProcessing}
             >
-              Pagar
+              {isProcessing ? 'Pagando...' : 'Pagar'}
             </Button>
           )}
           <PayableEditDialog
@@ -87,6 +90,7 @@ export const PayableTableRow = ({
             size="sm"
             variant="destructive"
             onClick={() => onDelete(payable.id)}
+            disabled={isProcessing}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

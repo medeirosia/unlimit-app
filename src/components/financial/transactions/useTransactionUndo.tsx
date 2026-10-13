@@ -53,6 +53,20 @@ export const useTransactionUndo = (
     });
 
     try {
+      if (transaction.type === 'payment' && transaction.reference_type === 'payable') {
+        const { data: undone, error } = await supabase.rpc('undo_account_payable_payment', {
+          p_transaction_id: transactionId
+        });
+        if (error) throw error;
+        if (undone) {
+          toast.success('Pagamento desfeito com sucesso');
+        } else {
+          toast.info('Esse lançamento já foi removido. Atualizando o extrato.');
+        }
+        onDataChange();
+        return;
+      }
+
       // 🚨 CORREÇÃO CRÍTICA: Verificar se é um saque de plataforma
       if (transaction.type === 'withdrawal' && transaction.is_platform_withdrawal) {
         console.log('🚨 DESFAZENDO SAQUE DE PLATAFORMA PENDENTE...');

@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -54,8 +54,13 @@ export const PayableDialog = ({
 }: PayableDialogProps) => {
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp ?? openInternal;
-  const setOpen = (v: boolean) => { onOpenChange ? onOpenChange(v) : setOpenInternal(v); };
+  const setOpen = (v: boolean) => {
+    if (onOpenChange) onOpenChange(v);
+    else setOpenInternal(v);
+  };
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
+  const requestIdRef = useRef<string | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
   const [formData, setFormData] = useState({
     description: '',
@@ -74,6 +79,7 @@ export const PayableDialog = ({
 
   const handleSubmit = async (e: React.FormEvent, shouldPay: boolean = false) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     
     if (!formData.description.trim()) {
       toast.error('Descrição é obrigatória');
@@ -100,65 +106,25 @@ export const PayableDialog = ({
       return;
     }
 
+    submittingRef.current = true;
     try {
+      requestIdRef.current ??= crypto.randomUUID();
       setLoading(true);
       
       // Formatar data para o banco usando fuso horário local
       const localDateString = formatDateForDatabase(dueDate);
       
-      // Criar a conta a pagar
-      const { data: payableData, error: payableError } = await supabase
-        .from('accounts_payable')
-        .insert([{
-          description: formData.description.trim(),
-          amount: formData.amount,
-          category_id: formData.category_id || null,
-          bank_account_id: formData.bank_account_id || null,
-          due_date: localDateString,
-          user_id: 'b5007d28-0311-4cc6-ae08-4a5b7c8cba34',
-          is_paid: shouldPay,
-          paid_date: shouldPay ? localDateString : null,
-        }])
-        .select()
-        .single();
-
-      if (payableError) throw payableError;
-
-      // Se deve pagar imediatamente, processar o pagamento
-      if (shouldPay && formData.bank_account_id) {
-        const bankAccount = bankAccounts.find(acc => acc.id === formData.bank_account_id);
-        if (bankAccount) {
-          // Atualizar saldo da conta bancária
-          const { error: balanceError } = await supabase
-            .from('bank_accounts')
-            .update({ balance: bankAccount.balance - formData.amount })
-            .eq('id', formData.bank_account_id);
-
-          if (balanceError) {
-            toast.error('Erro ao atualizar saldo');
-            return;
-          }
-
-          // Criar transação financeira usando a data de vencimento
-          const { error: transactionError } = await supabase
-            .from('financial_transactions')
-            .insert([{
-              user_id: 'b5007d28-0311-4cc6-ae08-4a5b7c8cba34',
-              description: `Pagamento: ${formData.description.trim()}`,
-              amount: formData.amount,
-              type: 'payment',
-              from_account_id: formData.bank_account_id,
-              reference_id: payableData.id,
-              reference_type: 'payable',
-              transaction_date: localDateString // Usar a data de vencimento como data da transação
-            }]);
-
-          if (transactionError) {
-            toast.error('Erro ao registrar transação');
-            return;
-          }
-        }
-      }
+      // O identificador permanece igual em uma tentativa repetida após falha de rede.
+      const { error } = await supabase.rpc('create_account_payable', {
+        p_request_id: requestIdRef.current,
+        p_description: formData.description.trim(),
+        p_amount: formData.amount,
+        p_category_id: formData.category_id,
+        p_bank_account_id: formData.bank_account_id,
+        p_due_date: localDateString,
+        p_pay_immediately: shouldPay
+      });
+      if (error) throw error;
 
       toast.success(shouldPay ? 'Conta a pagar criada e paga com sucesso!' : 'Conta a pagar criada com sucesso!');
       setFormData({
@@ -168,18 +134,24 @@ export const PayableDialog = ({
         bank_account_id: '',
       });
       setDueDate(undefined);
+      requestIdRef.current = null;
       setOpen(false);
       onPayableCreated();
     } catch (error) {
       console.error('Erro ao criar conta a pagar:', error);
-      toast.error('Erro ao criar conta a pagar');
+      toast.error(
+        typeof error === 'object' && error !== null && 'message' in error && typeof error.message === 'string'
+          ? error.message
+          : 'Erro ao criar conta a pagar'
+      );
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!loading) setOpen(nextOpen); }}>
       <DialogContent className="sm:max-w-[425px]">
         <form onSubmit={(e) => handleSubmit(e, false)}>
           <DialogHeader>
@@ -188,7 +160,7 @@ export const PayableDialog = ({
               Adicione uma nova conta a pagar ao sistema
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <fieldset className="grid gap-4 py-4" disabled={loading}>
             <div className="space-y-2">
               <Label htmlFor="description">Descrição</Label>
               <Input
@@ -214,6 +186,7 @@ export const PayableDialog = ({
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     className={cn(
                       'w-full justify-start text-left font-normal',
@@ -266,9 +239,9 @@ export const PayableDialog = ({
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </fieldset>
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
