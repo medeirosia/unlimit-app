@@ -22,6 +22,8 @@ import {
 import { MoreHorizontal, Edit, Trash2, Archive, Wallet, CreditCard, Building2, Smartphone, ClipboardCheck } from 'lucide-react';
 import { EditAccountDialog } from '../EditAccountDialog';
 import { UpdateRealBalanceDialog } from '../UpdateRealBalanceDialog';
+import { PayPalSyncButton } from './PayPalSyncButton';
+import { PAYPAL_ACCOUNT_ID } from '@/lib/paypalSync';
 import type { BankAccount } from '@/types/financial';
 
 interface BankAccountTableRowProps {
@@ -35,9 +37,10 @@ interface BankAccountTableRowProps {
   }) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
   onArchive: (id: string) => Promise<boolean>;
+  onPayPalSynced?: () => Promise<void>;
 }
 
-export const BankAccountTableRow = ({ account, onUpdate, onDelete, onArchive }: BankAccountTableRowProps) => {
+export const BankAccountTableRow = ({ account, onUpdate, onDelete, onArchive, onPayPalSynced }: BankAccountTableRowProps) => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [realBalanceDialogOpen, setRealBalanceDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -115,8 +118,11 @@ export const BankAccountTableRow = ({ account, onUpdate, onDelete, onArchive }: 
         </TableCell>
         
         <TableCell className="py-4 px-6 text-right">
+          <div className="flex flex-wrap items-start justify-end gap-3">
           <div className={`text-base font-medium ${account.balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+          {account.id === PAYPAL_ACCOUNT_ID && <PayPalSyncButton accountId={account.id} onSynced={onPayPalSynced} />}
           </div>
         </TableCell>
 

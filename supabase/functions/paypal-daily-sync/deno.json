@@ -1,0 +1,7 @@
+{
+  "compilerOptions": { "strict": true, "lib": ["deno.ns", "dom", "esnext"] },
+  "tasks": {
+    "check": "deno check index.ts handler.ts",
+    "test": "deno test --no-prompt handler_test.ts ../paypal-daily-preview/core_test.ts ../paypal-daily-preview/handler_test.ts"
+  }
+}

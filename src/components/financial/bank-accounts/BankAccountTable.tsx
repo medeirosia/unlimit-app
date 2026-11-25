@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { MoreVertical, Edit, Trash2, Archive, Wallet, CreditCard, Building2, Smartphone, ClipboardCheck } from 'lucide-react';
 import { BankAccountTableRow } from './BankAccountTableRow';
+import { PayPalSyncButton } from './PayPalSyncButton';
+import { PAYPAL_ACCOUNT_ID } from '@/lib/paypalSync';
 import { EditAccountDialog } from '../EditAccountDialog';
 import { UpdateRealBalanceDialog } from '../UpdateRealBalanceDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -38,9 +40,10 @@ interface BankAccountTableProps {
   }) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
   onArchive: (id: string) => Promise<boolean>;
+  onPayPalSynced?: () => Promise<void>;
 }
 
-export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: BankAccountTableProps) => {
+export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive, onPayPalSynced }: BankAccountTableProps) => {
   const [sortBy, setSortBy] = useState<'name' | 'balance' | 'created'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -221,6 +224,11 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
                             : `R$ ${account.real_balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                         </span>
                       </div>
+                      {account.id === PAYPAL_ACCOUNT_ID && (
+                        <div className="mt-2 flex justify-end">
+                          <PayPalSyncButton accountId={account.id} onSynced={onPayPalSynced} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -351,6 +359,7 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive }: Ba
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onArchive={onArchive}
+                onPayPalSynced={onPayPalSynced}
               />
             ))}
           </TableBody>

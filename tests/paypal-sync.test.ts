@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { parsePayPalStatus, summarizePayPalSync, formatPayPalSyncTime, payPalSyncErrorMessage, PayPalSyncRequestError } from '../src/lib/paypalSync.ts';
+const date='2026-11-25T14:07:03Z';
+const response=(fresh=0,old=6)=>({ok:true,mode:'daily_sales_import',real_balance_untouched:true,last_synced_at:date,results:[{new_sales:fresh,already_imported:old,sales_count:fresh+old}]});
+Deno.test('last sync status survives reload using server state',()=>{assert.equal(parsePayPalStatus({ok:true,enabled:true,last_run:{created_at:date,status:'completed',sale_date:'2026-11-24'}}).last_run?.created_at,date);});
+Deno.test('failed attempts are not treated as successful synchronization',()=>{assert.equal(parsePayPalStatus({ok:true,enabled:true,last_run:{created_at:date,status:'failed'}}).last_run?.status,'failed');});
+Deno.test('an integration with no previous runs has no invented timestamp',()=>{assert.equal(parsePayPalStatus({ok:true,enabled:true,last_run:null}).last_run,null);});
+Deno.test('disabled integration remains disabled in the control',()=>{assert.equal(parsePayPalStatus({ok:true,enabled:false,last_run:null}).enabled,false);});
+Deno.test('repeated manual import reports zero new sales',()=>{const r=summarizePayPalSync(response()); assert.equal(r.newSales,0);assert.equal(r.alreadyImported,6);assert.match(r.message,/Nenhuma venda nova/);});
+Deno.test('new sales are distinct from previously imported sales',()=>{const r=summarizePayPalSync(response(2,6));assert.equal(r.newSales,2);assert.match(r.message,/2 vendas importadas/);});
+Deno.test('bad counters, failed result and missing real-balance guarantee never show success',()=>{for(const r of [{...response(),ok:false},{...response(),real_balance_untouched:false},{...response(),results:[{new_sales:-1,already_imported:6,sales_count:5}]}])assert.throws(()=>summarizePayPalSync(r));});
+Deno.test('timestamps use Fortaleza, including the prior day after UTC midnight',()=>{assert.match(formatPayPalSyncTime('2026-11-25T01:30:00Z'),/24\/11.*22:30/);});
+Deno.test('expired session asks for a new login without exposing raw errors',()=>{assert.match(payPalSyncErrorMessage(new PayPalSyncRequestError('INVALID_USER_SESSION',401)),/sessão expirou/);assert(!payPalSyncErrorMessage(new Error('private-bearer')).includes('private-bearer'));});
+Deno.test('review conflicts are not described as successful or forced balance changes',()=>{assert.match(payPalSyncErrorMessage(new PayPalSyncRequestError('PAYPAL_IMPORTED_SALE_CHANGED',409)),/conferência/);});

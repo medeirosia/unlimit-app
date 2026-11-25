@@ -1,0 +1,7 @@
+{
+  "compilerOptions": { "strict": true, "lib": ["deno.ns", "dom", "esnext"] },
+  "tasks": {
+    "check": "deno check index.ts handler.ts core.ts",
+    "test": "deno test --no-prompt core_test.ts handler_test.ts"
+  }
+}

@@ -8,3 +8,10 @@ verify_jwt = false
 
 [functions.import-returns]
 verify_jwt = false
+
+[functions.paypal-daily-preview]
+verify_jwt = true
+
+# Own authentication: live owner session, exact service key or scoped cron token.
+[functions.paypal-daily-sync]
+verify_jwt = false

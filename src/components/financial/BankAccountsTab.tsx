@@ -26,6 +26,7 @@ export const BankAccountsTab = ({ onDataChange }: BankAccountsTabProps = {}) => 
     updateBankAccount,
     deleteBankAccount,
     archiveBankAccount,
+    fetchBankAccounts,
   } = useBankAccounts();
 
   const bankAccounts = allAccounts.filter(a => can('financeiro.contas.ver_conta', a.id));
@@ -41,6 +42,10 @@ export const BankAccountsTab = ({ onDataChange }: BankAccountsTabProps = {}) => 
   const handleTransferComplete = async () => {
     if (onDataChange) await onDataChange();
     else await fetchData();
+  };
+
+  const handlePayPalSynced = async () => {
+    await Promise.all([fetchBankAccounts(), onDataChange ? onDataChange() : fetchData()]);
   };
 
   if (loading) {
@@ -114,6 +119,7 @@ export const BankAccountsTab = ({ onDataChange }: BankAccountsTabProps = {}) => 
             onUpdate={async (id, updates) => updateBankAccount(id, updates)}
             onDelete={deleteBankAccount}
             onArchive={archiveBankAccount}
+            onPayPalSynced={handlePayPalSynced}
           />
         </div>
       )}
