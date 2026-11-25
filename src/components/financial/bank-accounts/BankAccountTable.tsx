@@ -216,6 +216,11 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive, onPa
                           R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
+                      {account.id === PAYPAL_ACCOUNT_ID && (
+                        <div className="mt-2 flex justify-end">
+                          <PayPalSyncButton accountId={account.id} onSynced={onPayPalSynced} />
+                        </div>
+                      )}
                       <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-xs">
                         <span className="text-slate-500">Saldo Real: </span>
                         <span className="font-semibold text-slate-800">
@@ -224,11 +229,6 @@ export const BankAccountTable = ({ accounts, onUpdate, onDelete, onArchive, onPa
                             : `R$ ${account.real_balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                         </span>
                       </div>
-                      {account.id === PAYPAL_ACCOUNT_ID && (
-                        <div className="mt-2 flex justify-end">
-                          <PayPalSyncButton accountId={account.id} onSynced={onPayPalSynced} />
-                        </div>
-                      )}
                     </div>
                   </div>
                 </CardContent>

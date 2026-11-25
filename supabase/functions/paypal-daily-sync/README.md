@@ -4,6 +4,12 @@ The existing daily job remains active at 09:00 America/Fortaleza. The manual
 button beside the PayPal Saldo Atual uses the same atomic, idempotent importer.
 Both paths query only closed days. They never change manual Saldo Real fields.
 
+All PayPal sales use the owner's existing **Low-Tickets LATAM** receivable
+category. Missing/ambiguous categories require review instead of an uncategorized
+posting. Existing imported PayPal receipts were reclassified by a separate
+category-only migration with a private rollback archive; amounts, effective
+dates, statement records and manual balances are preserved.
+
 ## Authentication
 
 This Edge Function implements authentication itself (`verify_jwt=false`):
@@ -57,6 +63,8 @@ and ambiguous transactions are not guessed into sales or balance corrections.
   tests, including repeat results, failed attempts and Fortaleza timestamps.
 - Frontend TypeScript, targeted ESLint and production Vite build passed.
 - Live user-session clicking is intentionally deferred at the user's request.
+- Category-only backfill and future Low-Tickets LATAM posting/repetition were
+  verified separately with transaction rollback; synthetic rows did not persist.
 
 Deploy the sync folder plus the sibling preview `handler.ts` and `core.ts`,
 preserving their relative folders. Existing provider Secrets remain server-only.
