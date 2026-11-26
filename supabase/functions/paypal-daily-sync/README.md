@@ -4,6 +4,23 @@ The existing daily job remains active at 09:00 America/Fortaleza. The manual
 button beside the PayPal Saldo Atual uses the same atomic, idempotent importer.
 Both paths query only closed days. They never change manual Saldo Real fields.
 
+## PayPal calendar and booking dates
+
+Closed days and D-1 follow the owner's PayPal reporting calendar,
+`America/Los_Angeles` (PST/PDT), independently of the cron's Fortaleza execution
+time. Both midnight boundaries are computed in that IANA zone; DST days may
+span 23 or 25 hours. The database independently validates the zone, exact
+boundaries, provider closing coverage and each source transaction's local day.
+An old/mismatched worker fails closed before financial posting.
+
+Receivables and statement receipts use the PayPal calendar date. Statement
+`transaction_date` uses the application's existing UTC-midnight date-only
+convention, while `source_snapshot.initiated_at` retains the original provider
+instant. The migration verifies that preexisting imports retain the same
+calendar day, archives original statement timestamps and old day checks in the
+private repair archive, then invalidates only the old-zone completion checks.
+It does not remove receipts/source mappings, alter amounts or set balances.
+
 ## Total-balance accounting, including withheld funds
 
 The owner selected total net sales, including temporarily withheld money, not
@@ -77,7 +94,7 @@ and ambiguous transactions are not guessed into sales or balance corrections.
 
 ## Verification
 
-- `deno task check`, `deno task test`, `deno lint .`: 76 backend/authorization
+- `deno task check`, `deno task test`, `deno lint .`: 80 backend/authorization
   tests, all using fake credentials and no network.
 - From repo root: `deno test --no-prompt tests/paypal-sync.test.ts`: 10 UI helper
   tests, including repeat results, failed attempts and Fortaleza timestamps.
@@ -85,6 +102,10 @@ and ambiguous transactions are not guessed into sales or balance corrections.
 - Live user-session clicking is intentionally deferred at the user's request.
 - Category-only backfill and future Low-Tickets LATAM posting/repetition were
   verified separately with transaction rollback; synthetic rows did not persist.
+- `supabase/tests/paypal_pacific_reporting.sql` verifies a late Pacific sale,
+  date-only statement booking, category, exactly one net balance effect, repeat
+  idempotency, legacy/malformed cutoff rejection and unchanged manual fields.
+  The entire test transaction is rolled back.
 
 Deploy the sync folder plus the sibling preview `handler.ts` and `core.ts`,
 preserving their relative folders. Existing provider Secrets remain server-only.

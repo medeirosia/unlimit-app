@@ -20,8 +20,9 @@ records, edits the manual Saldo Real, installs a cron job or sends payments.
 ## Request
 
 POST JSON `{ "date": "2026-11-24", "include_balances": true }`. With `{}`, the
-date defaults to D-1 in `America/Fortaleza`. Explicit dates must be closed days
-within the preceding 90 days. Start/end include the entire UTC-03 day. The
+date defaults to D-1 in PayPal's `America/Los_Angeles` calendar (PST/PDT).
+Explicit dates must be closed days within the preceding 90 days. Start/end
+are independent civil midnights, including 23/25-hour DST transition days. The
 provider query includes next midnight and excludes that boundary locally, so
 truncation of fractional seconds cannot silently omit the final second.
 

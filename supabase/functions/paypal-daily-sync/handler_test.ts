@@ -4,6 +4,7 @@ import {
   buildPreview,
   dayRange,
   PAYPAL_ACCOUNT_ID,
+  TIME_ZONE,
 } from "../paypal-daily-preview/core.ts";
 
 const now = new Date("2026-11-25T15:00:00Z");
@@ -59,6 +60,7 @@ function setup(
     authUserId?: string;
     accountOwnerId?: string;
     accountActive?: boolean;
+    timezone?: string;
   } = {},
 ) {
   const calls: string[] = [];
@@ -109,6 +111,7 @@ function setup(
       if (url.pathname.endsWith("paypal_sync_plan")) {
         return json({
           enabled,
+          timezone: options.timezone ?? TIME_ZONE,
           dates: ["2026-11-24"],
           unrecoverable_gap: options.gap ?? false,
         });
@@ -151,7 +154,7 @@ function setup(
         last_refreshed_datetime: options.stale
           ? "2026-11-24T12:00:00Z"
           : "2026-11-25T14:00:00Z",
-        end_date: "2026-11-25T03:00:00Z",
+        end_date: "2026-11-25T08:00:00Z",
       });
     }
     throw new Error("unexpected unit route containing no real credentials");
@@ -171,6 +174,7 @@ Deno.test("postability accepts one exact provider-net BRL sale", () => {
 for (
   const [name, change] of [
     ["wrong account", { account_id: "another" }],
+    ["legacy Fortaleza cutoff", { timezone: "America/Fortaleza" }],
     ["current/open day mismatch", { date: "2026-11-25" }],
     ["stale coverage", { provider_refreshed_through_day_end: false }],
     ["warnings", { warnings: ["REVIEW_REQUIRED"] }],
@@ -193,6 +197,20 @@ Deno.test("postability rejects an incorrect sum", () => {
   const p = report();
   p.reconciled_sales.total_net_brl = "96.00";
   assert.throws(() => assertPostable(p, "2026-11-24"));
+});
+Deno.test("a mismatched database calendar blocks before PayPal or any posting", async () => {
+  const { handler, calls } = setup({ timezone: "America/Fortaleza" });
+  const response = await handler(request({ action: "preview" }));
+  assert.equal(response.status, 409);
+  assert.equal(
+    (await response.json()).error,
+    "REPORTING_TIMEZONE_REQUIRES_REVIEW",
+  );
+  assert(
+    !calls.some((c) =>
+      c.includes("/v1/reporting/") || c.includes("paypal_sync_post_day")
+    ),
+  );
 });
 Deno.test("anonymous and arbitrary tokens make no downstream calls", async () => {
   for (const t of [null, "fake-anon"]) {

@@ -24,14 +24,14 @@ export function transaction(overrides: Record<string, unknown> = {}) {
   };
 }
 
-Deno.test("D-1 uses Fortaleza rather than the server UTC calendar", () => {
+Deno.test("D-1 follows PayPal Pacific time, not Fortaleza or the server UTC calendar", () => {
   assert.equal(dayRange(undefined, now).date, "2026-11-24");
   assert.equal(
-    dayRange(undefined, new Date("2026-11-25T02:59:59Z")).date,
+    dayRange(undefined, new Date("2026-11-25T07:59:59Z")).date,
     "2026-11-23",
   );
   assert.equal(
-    dayRange(undefined, new Date("2026-11-25T03:00:00Z")).date,
+    dayRange(undefined, new Date("2026-11-25T08:00:00Z")).date,
     "2026-11-24",
   );
   assert.equal(
@@ -41,9 +41,23 @@ Deno.test("D-1 uses Fortaleza rather than the server UTC calendar", () => {
 });
 Deno.test("D-1 boundaries include the whole local day, with an explicit opening cutoff", () => {
   const r = dayRange("2026-11-24", now);
-  assert.equal(new Date(r.start).toISOString(), "2026-11-24T03:00:00.000Z");
-  assert.equal(new Date(r.end).toISOString(), "2026-11-25T02:59:59.999Z");
-  assert.equal(r.opening_as_of, "2026-11-24T02:59:59.999Z");
+  assert.equal(r.timezone, "America/Los_Angeles");
+  assert.equal(r.start, "2026-11-24T08:00:00.000Z");
+  assert.equal(r.end, "2026-11-25T07:59:59.999Z");
+  assert.equal(r.opening_as_of, "2026-11-24T07:59:59.999Z");
+});
+Deno.test("summer reports use PDT without drifting the PayPal day", () => {
+  const r = dayRange("2026-07-01", new Date("2026-07-02T13:00:00Z"));
+  assert.equal(r.start, "2026-07-01T07:00:00.000Z");
+  assert.equal(r.end_exclusive, "2026-07-02T07:00:00.000Z");
+});
+Deno.test("both daylight-saving transitions use civil midnights, not fixed 24-hour windows", () => {
+  const spring = dayRange("2026-03-08", new Date("2026-03-09T13:00:00Z"));
+  assert.equal(spring.start, "2026-03-08T08:00:00.000Z");
+  assert.equal(spring.end_exclusive, "2026-03-09T07:00:00.000Z");
+  const fall = dayRange("2026-11-01", now);
+  assert.equal(fall.start, "2026-11-01T07:00:00.000Z");
+  assert.equal(fall.end_exclusive, "2026-11-02T08:00:00.000Z");
 });
 Deno.test("invalid, open and out-of-range dates are rejected", () => {
   for (

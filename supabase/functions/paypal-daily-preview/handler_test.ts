@@ -48,7 +48,7 @@ function setup(
         total_items: 1,
         total_pages: 1,
         last_refreshed_datetime: "2026-11-25T10:00:00Z",
-        end_date: "2026-11-25T03:00:00Z",
+        end_date: "2026-11-25T08:00:00Z",
       }));
     }
     if (url.pathname === "/v1/reporting/balances") {
@@ -124,7 +124,7 @@ Deno.test("successful preview requests D-1, filters to balance effects and never
   assert.equal(calls[1].url.searchParams.get("fields"), "transaction_info");
   assert.equal(
     calls[1].url.searchParams.get("start_date"),
-    "2026-11-24T00:00:00-03:00",
+    "2026-11-24T08:00:00.000Z",
   );
   assert(
     calls.every((c) =>
@@ -332,7 +332,7 @@ Deno.test("the next midnight boundary is queried but excluded from yesterday", a
     transaction_info: {
       ...record.transaction_info,
       transaction_id: "NEXT-DAY",
-      transaction_initiation_date: "2026-11-25T03:00:00Z",
+      transaction_initiation_date: "2026-11-25T08:00:00Z",
     },
   };
   const { handler, calls } = setup(
@@ -347,7 +347,7 @@ Deno.test("the next midnight boundary is queried but excluded from yesterday", a
           transaction_details: [record, nextMidnight],
           total_items: 2,
           total_pages: 1,
-          end_date: "2026-11-25T03:00:00Z",
+          end_date: "2026-11-25T08:00:00Z",
           last_refreshed_datetime: "2026-11-25T10:00:00Z",
         }),
   );
@@ -358,7 +358,7 @@ Deno.test("the next midnight boundary is queried but excluded from yesterday", a
   assert.equal(body.provider_refreshed_through_day_end, true);
   assert.equal(
     calls[1].url.searchParams.get("end_date"),
-    "2026-11-25T03:00:00.000Z",
+    "2026-11-25T08:00:00.000Z",
   );
 });
 
@@ -379,7 +379,7 @@ Deno.test("historical running balances can be checked with existing Search acces
       }],
       total_items: 1,
       total_pages: 1,
-      end_date: "2026-11-25T03:00:00Z",
+      end_date: "2026-11-25T08:00:00Z",
       last_refreshed_datetime: "2026-11-25T10:00:00Z",
     });
   });
@@ -416,7 +416,7 @@ Deno.test("a zero-result PayPal report may omit the transaction array", async ()
         : dataResponse({
           total_items: 0,
           total_pages: 0,
-          end_date: "2026-11-25T03:00:00Z",
+          end_date: "2026-11-25T08:00:00Z",
           last_refreshed_datetime: "2026-11-25T10:00:00Z",
         }),
   );

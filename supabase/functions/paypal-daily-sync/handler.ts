@@ -3,6 +3,7 @@ import {
   equalSecret,
   PAYPAL_ACCOUNT_ID,
   PreviewError,
+  TIME_ZONE,
   toCents,
   validDay,
 } from "../paypal-daily-preview/core.ts";
@@ -28,7 +29,8 @@ export function assertPostable(p: Preview, date: string): void {
   if (
     p.ok !== true || p.mode !== "read_only_preview" ||
     p.environment !== "live" ||
-    p.account_id !== PAYPAL_ACCOUNT_ID || p.date !== date || !validDay(date) ||
+    p.account_id !== PAYPAL_ACCOUNT_ID || p.timezone !== TIME_ZONE ||
+    p.date !== date || !validDay(date) ||
     p.provider_refreshed_through_day_end !== true ||
     !Array.isArray(p.warnings) || p.warnings.length !== 0 ||
     !p.reconciled_sales || !Array.isArray(p.reconciled_sales.sales) ||
@@ -233,6 +235,9 @@ export function createSyncHandler(deps: Dependencies) {
         dates: string[];
         [key: string]: unknown;
       };
+      if (plan.timezone !== TIME_ZONE) {
+        throw new PreviewError("REPORTING_TIMEZONE_REQUIRES_REVIEW", 409);
+      }
       if (plan.unrecoverable_gap === true) {
         throw new PreviewError("HISTORICAL_REPORT_GAP_REQUIRES_REVIEW", 409);
       }

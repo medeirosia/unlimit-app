@@ -1,5 +1,7 @@
 // Pure, dependency-free reporting logic. No database writes or exchange estimates.
-export const TIME_ZONE = "America/Fortaleza";
+// PayPal's account report calendar: PST in winter, PDT in summer. The cron
+// execution time is separately kept at 09:00 America/Fortaleza.
+export const TIME_ZONE = "America/Los_Angeles";
 export const PAYPAL_ACCOUNT_ID = "8cb28ca7-95f3-4e93-9305-33c2d7771935";
 
 export class PreviewError extends Error {
@@ -29,6 +31,37 @@ export function validDay(day: unknown): day is string {
   return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === day;
 }
 
+function midnightUtc(day: string): string {
+  const target = Date.parse(`${day}T00:00:00Z`);
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  let instant = target;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const parts = formatter.formatToParts(new Date(instant));
+    const part = (kind: string) =>
+      Number(parts.find((p) => p.type === kind)!.value);
+    const civil = Date.UTC(
+      part("year"),
+      part("month") - 1,
+      part("day"),
+      part("hour"),
+      part("minute"),
+      part("second"),
+    );
+    if (civil === target) return new Date(instant).toISOString();
+    instant += target - civil;
+  }
+  throw new PreviewError("REPORTING_TIMEZONE_REQUIRES_REVIEW", 503);
+}
+
 export function dayRange(input: unknown, now: Date) {
   const today = localDay(now);
   const previous = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
@@ -43,15 +76,18 @@ export function dayRange(input: unknown, now: Date) {
   ) {
     throw new PreviewError("DATE_OUTSIDE_90_DAY_PREVIEW", 400);
   }
-  // Fortaleza is UTC-03 throughout the permitted contemporary reporting period.
-  const start = `${date}T00:00:00-03:00`;
-  const end = `${date}T23:59:59.999-03:00`;
+  const nextDay = new Date(Date.parse(`${date}T12:00:00Z`) + 86_400_000)
+    .toISOString().slice(0, 10);
+  const start = midnightUtc(date);
+  // Compute both civil midnights independently: DST days can have 23/25 hours.
+  const endExclusive = midnightUtc(nextDay);
+  const end = new Date(Date.parse(endExclusive) - 1).toISOString();
   return {
     date,
     timezone: TIME_ZONE,
     start,
     end,
-    end_exclusive: new Date(Date.parse(start) + 86_400_000).toISOString(),
+    end_exclusive: endExclusive,
     opening_as_of: new Date(Date.parse(start) - 1).toISOString(),
   };
 }
