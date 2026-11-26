@@ -345,3 +345,31 @@ Deno.test("archived accounts cannot be synchronized through a user session", asy
   assert.equal((await s.handler(request({}, ownerToken))).status, 403);
   assert(!s.calls.includes("/v1/oauth2/token"));
 });
+
+Deno.test("scoped diagnostics return review warnings without posting or writing an audit failure", async () => {
+  const s = setup({ warning: true });
+  const response = await s.handler(request({ action: "preview" }, cron));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.results[0].postable, false);
+  assert.equal(body.results[0].review_error, "REPORT_REQUIRES_REVIEW");
+  assert(body.results[0].report.warnings.length > 0);
+  assert(
+    !s.calls.some((x) =>
+      x.endsWith("paypal_sync_post_day") ||
+      x.endsWith("paypal_sync_record_failure")
+    ),
+  );
+});
+Deno.test("owner diagnostics remain read-only even for a stale provider report", async () => {
+  const s = setup({ stale: true });
+  const response = await s.handler(request({ action: "preview" }, ownerToken));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).results[0].postable, false);
+  assert(
+    !s.calls.some((x) =>
+      x.endsWith("paypal_sync_post_day") ||
+      x.endsWith("paypal_sync_record_failure")
+    ),
+  );
+});

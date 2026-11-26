@@ -149,6 +149,101 @@ Deno.test("secret comparison requires the complete value", () => {
   assert(!equalSecret("fake-token", "other-toke"));
 });
 
+function availabilityRecord(
+  code: string,
+  amount: string,
+  extra: Record<string, unknown> = {},
+) {
+  return transaction({
+    transaction_id: `UNIT-${code}-${amount}`,
+    paypal_reference_id: "UNIT-ORIGINAL-SALE",
+    transaction_event_code: code,
+    transaction_amount: { currency_code: "BRL", value: amount },
+    fee_amount: undefined,
+    ...extra,
+  });
+}
+Deno.test("a partial hold never reduces the original net sale or creates an expense", () => {
+  const result = buildPreview([
+    transaction(),
+    availabilityRecord("T2101", "-25.00"),
+  ]);
+  assert.equal(result.reconciled_sales.count, 1);
+  assert.equal(result.reconciled_sales.total_net_brl, "95.00");
+  assert.equal(result.confirmed_brl_balance_effects.net, "70.00");
+  assert.equal(result.availability_movements.held_brl, "25.00");
+  assert.equal(
+    result.availability_movements.financial_posting,
+    "NONE_AVAILABILITY_ONLY",
+  );
+  assert.equal(result.reconciled_sales.unmatched_successful_records, 0);
+  assert.deepEqual(result.warnings, []);
+});
+Deno.test("a full hold still counts the full net sale once", () => {
+  const result = buildPreview([
+    transaction(),
+    availabilityRecord("T2101", "-95.00"),
+  ]);
+  assert.equal(result.reconciled_sales.total_net_brl, "95.00");
+  assert.equal(result.confirmed_brl_balance_effects.net, "0.00");
+  assert.deepEqual(result.warnings, []);
+});
+Deno.test("a later-day release does not create a second sale", () => {
+  const result = buildPreview([availabilityRecord("T2102", "95.00")]);
+  assert.equal(result.reconciled_sales.count, 0);
+  assert.equal(result.reconciled_sales.total_net_brl, "0.00");
+  assert.equal(result.availability_movements.released_brl, "95.00");
+  assert.deepEqual(result.warnings, []);
+});
+for (
+  const [hold, release] of [["T2101", "T2102"], ["T2103", "T2104"], [
+    "T2105",
+    "T2106",
+  ], ["T2107", "T2108"]]
+) {
+  Deno.test(`${hold}/${release} is availability-only, not additional revenue`, () => {
+    const r = buildPreview([
+      transaction(),
+      availabilityRecord(hold, "-10.00"),
+      availabilityRecord(release, "10.00"),
+    ]);
+    assert.equal(r.reconciled_sales.total_net_brl, "95.00");
+    assert.equal(r.availability_movements.record_count, 2);
+    assert.deepEqual(r.warnings, []);
+  });
+}
+Deno.test("malformed holds, fees, foreign currencies and unknown events remain blocked", () => {
+  for (
+    const record of [
+      availabilityRecord("T2101", "25.00"),
+      availabilityRecord("T2102", "-25.00"),
+      availabilityRecord("T2101", "-25.00", {
+        fee_amount: { currency_code: "BRL", value: "-1.00" },
+      }),
+      availabilityRecord("T2101", "-25.00", {
+        transaction_amount: { currency_code: "EUR", value: "-25.00" },
+      }),
+      availabilityRecord("T9900", "-25.00"),
+    ]
+  ) {
+    const r = buildPreview([record]);
+    assert.equal(r.reconciled_sales.unmatched_successful_records, 1);
+    assert(
+      r.warnings.includes(
+        "UNCLASSIFIED_SUCCESSFUL_RECORDS_REQUIRE_RECONCILIATION",
+      ),
+    );
+  }
+});
+Deno.test("repeated hold rows are deduplicated but never added to sales", () => {
+  const h = availabilityRecord("T2101", "-25.00");
+  const r = buildPreview([transaction(), h, h]);
+  assert.equal(r.availability_movements.record_count, 1);
+  assert.equal(r.availability_movements.held_brl, "25.00");
+  assert.equal(r.exact_duplicates_ignored, 1);
+  assert.equal(r.reconciled_sales.count, 1);
+});
+
 function convertedTriplet(
   id: string,
   brl = "85.11",

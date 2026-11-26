@@ -105,7 +105,66 @@ type ReportRow = {
   updated_at: string | null;
 };
 
-function reconcileSales(rows: ReportRow[]) {
+// These documented event pairs move money between available and withheld
+// balances. Under the owner's TOTAL balance rule they are not income/expenses.
+// Unknown codes, non-BRL amounts, fees or unexpected signs still require review.
+function reconcileAvailability(rows: ReportRow[]) {
+  const holdCodes = new Set(["T2101", "T2103", "T2105", "T2107"]);
+  const releaseCodes = new Set(["T2102", "T2104", "T2106", "T2108"]);
+  const consumed = new Set<ReportRow>();
+  const records: Array<
+    {
+      transaction_id: string;
+      reference_id: string | null;
+      event_code: string;
+      kind: "hold" | "release";
+      amount_brl: string;
+    }
+  > = [];
+  let held = 0;
+  let released = 0;
+  for (const row of rows) {
+    const hold = holdCodes.has(row.event_code);
+    const release = releaseCodes.has(row.event_code);
+    if (
+      (!hold && !release) || row.status !== "S" || row.currency !== "BRL" ||
+      !row.transaction_id || row.gross === null || row.net_brl === null ||
+      (row.fee_currency !== null && row.fee_currency !== "BRL")
+    ) continue;
+    const amount = toCents(row.gross);
+    if (
+      toCents(row.fee ?? "0") !== 0 || toCents(row.net_brl) !== amount ||
+      (hold && amount >= 0) || (release && amount <= 0)
+    ) continue;
+    consumed.add(row);
+    if (hold) held -= amount;
+    else released += amount;
+    records.push({
+      transaction_id: row.transaction_id,
+      reference_id: row.reference_id,
+      event_code: row.event_code,
+      kind: hold ? "hold" : "release",
+      amount_brl: money(amount),
+    });
+  }
+  return {
+    consumed,
+    summary: {
+      accounting_basis: "TOTAL_NET_SALES_INCLUDING_WITHHELD",
+      financial_posting: "NONE_AVAILABILITY_ONLY",
+      record_count: consumed.size,
+      held_brl: money(held),
+      released_brl: money(released),
+      available_balance_effect_brl: money(released - held),
+      records,
+    },
+  };
+}
+
+function reconcileSales(
+  rows: ReportRow[],
+  availabilityRecords: Set<ReportRow>,
+) {
   const consumed = new Set<ReportRow>();
   const sales: Array<{
     source_transaction_id: string;
@@ -208,7 +267,9 @@ function reconcileSales(rows: ReportRow[]) {
       total_net_brl: money(total),
       matched_report_records: consumed.size,
       unmatched_successful_records:
-        rows.filter((r) => r.status === "S" && !consumed.has(r)).length,
+        rows.filter((r) =>
+          r.status === "S" && !consumed.has(r) && !availabilityRecords.has(r)
+        ).length,
       posting_basis: "PROVIDER_NET_BRL_NO_SECOND_FEE_DEDUCTION",
       sales,
     },
@@ -312,7 +373,8 @@ export function buildPreview(details: TransactionDetail[]) {
       groups.set(t.transaction_event_code, group);
     }
   }
-  const reconciled = reconcileSales(rows);
+  const availability = reconcileAvailability(rows);
+  const reconciled = reconcileSales(rows, availability.consumed);
   if (reconciled.summary.unmatched_successful_records > 0) {
     warnings.add("UNCLASSIFIED_SUCCESSFUL_RECORDS_REQUIRE_RECONCILIATION");
   }
@@ -350,6 +412,7 @@ export function buildPreview(details: TransactionDetail[]) {
     })),
     warnings: [...warnings],
     reconciled_sales: reconciled.summary,
+    availability_movements: availability.summary,
     transactions: rows,
   };
 }

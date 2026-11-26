@@ -4,6 +4,21 @@ The existing daily job remains active at 09:00 America/Fortaleza. The manual
 button beside the PayPal Saldo Atual uses the same atomic, idempotent importer.
 Both paths query only closed days. They never change manual Saldo Real fields.
 
+## Total-balance accounting, including withheld funds
+
+The owner selected total net sales, including temporarily withheld money, not
+only the amount currently available for withdrawal. Standard BRL hold/release
+pairs T2101/T2102, T2103/T2104, T2105/T2106 and T2107/T2108 are classified as
+availability-only records when their status, currency, sign and zero-fee fields
+are consistent. Holds are not expenses and releases are not additional sales.
+The original sale is posted once at its actual provider net BRL conversion
+credit, with fees already deducted. Unknown or malformed movements still block
+posting for review; there is no blanket exclusion of T21xx events.
+
+The provider's sales-volume chart is not a substitute for transaction-level net
+accounting. Reporting cutoffs/time zones and fees must be reconciled explicitly;
+amounts are never changed to match a rounded chart total.
+
 All PayPal sales use the owner's existing **Low-Tickets LATAM** receivable
 category. Missing/ambiguous categories require review instead of an uncategorized
 posting. Existing imported PayPal receipts were reclassified by a separate
@@ -15,9 +30,11 @@ dates, statement records and manual balances are preserved.
 This Edge Function implements authentication itself (`verify_jwt=false`):
 
 - Exact server service key: administrative setup and tests.
-- Scoped cron bearer validated through a service-only RPC: `run` only.
+- Scoped cron bearer validated through a service-only RPC: `run` or read-only
+  `preview` diagnostics.
 - Live Supabase Auth session validated with `/auth/v1/user`, followed by an
-  account-owner/active lookup from the database: `run` and read-only `status`.
+  account-owner/active lookup from the database: `run`, read-only `status` and
+  read-only `preview` diagnostics.
   User-editable metadata and decoded JWT claims are never trusted. Other users,
   anonymous requests, expired sessions and archived accounts are rejected.
 - Browser CORS permits only the two production domains and Supabase Dashboard.
@@ -42,6 +59,9 @@ are distinct from successful timestamps. A retry never re-enters existing sales.
 
 The read-only `status` action never queries PayPal or posts a financial entry.
 Neither the button nor user sessions can activate or change the schedule.
+`preview` diagnostics return redacted provider reports and review reasons,
+including reports that cannot be posted. They make no ledger or failure-log
+writes. No arbitrary account/date can be supplied by the caller.
 
 ## Operations
 
@@ -57,7 +77,7 @@ and ambiguous transactions are not guessed into sales or balance corrections.
 
 ## Verification
 
-- `deno task check`, `deno task test`, `deno lint .`: 65 backend/authorization
+- `deno task check`, `deno task test`, `deno lint .`: 76 backend/authorization
   tests, all using fake credentials and no network.
 - From repo root: `deno test --no-prompt tests/paypal-sync.test.ts`: 10 UI helper
   tests, including repeat results, failed attempts and Fortaleza timestamps.

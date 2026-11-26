@@ -82,6 +82,7 @@ export function createSyncHandler(deps: Dependencies) {
     const respond = (v: unknown, status = 200) =>
       new Response(JSON.stringify(v), { status, headers });
     let authorized = false;
+    let previewOnly = false;
     let currentDate: string | null = null;
     let rpc: (name: string, body?: unknown) => Promise<unknown>;
     try {
@@ -219,11 +220,13 @@ export function createSyncHandler(deps: Dependencies) {
         throw new PreviewError("INVALID_SYNC_ACTION", 400);
       }
       if (
-        (caller === "cron" && action !== "run") ||
-        (caller === "owner" && action !== "run" && action !== "status")
+        (caller === "cron" && action !== "run" && action !== "preview") ||
+        (caller === "owner" && action !== "run" && action !== "status" &&
+          action !== "preview")
       ) {
         throw new PreviewError("ADMIN_REQUIRED", 403);
       }
+      previewOnly = action === "preview";
       if (action === "activate") await rpc("paypal_sync_activate");
       const plan = await rpc("paypal_sync_plan") as {
         enabled: boolean;
@@ -260,14 +263,29 @@ export function createSyncHandler(deps: Dependencies) {
         if (!response.ok) {
           throw new PreviewError("PAYPAL_DAILY_REPORT_UNAVAILABLE", 502);
         }
-        assertPostable(preview, date);
         if (action === "preview") {
+          let postable = true;
+          let reviewError: string | null = null;
+          try {
+            assertPostable(preview, date);
+          } catch (error) {
+            postable = false;
+            reviewError = error instanceof PreviewError
+              ? error.code
+              : "REPORT_REQUIRES_REVIEW";
+          }
           results.push({
             date,
             count: preview.reconciled_sales.count,
             net_brl: preview.reconciled_sales.total_net_brl,
+            postable,
+            review_error: reviewError,
+            // Already normalized/redacted by the preview handler: no payer data,
+            // credentials, headers or raw upstream bodies are included.
+            report: preview,
           });
         } else {
+          assertPostable(preview, date);
           results.push(
             await rpc("paypal_sync_post_day", { p_report: preview }),
           );
@@ -286,7 +304,7 @@ export function createSyncHandler(deps: Dependencies) {
       const code = error instanceof PreviewError
         ? error.code
         : "SYNC_UNAVAILABLE";
-      if (authorized && rpc!) {
+      if (authorized && !previewOnly && rpc!) {
         // Store only our finite error code. Never record raw upstream responses,
         // authorization headers, credentials, payer identity or thrown messages.
         try {
